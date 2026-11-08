@@ -1,0 +1,12 @@
+101,Rahul,Mathematics,85
+101,Rahul,DataStructures,78
+101,Rahul,BigData,92
+102,Priya,Mathematics,64
+102,Priya,DataStructures,71
+102,Priya,BigData,69
+103,Ankit,Mathematics,45
+103,Ankit,DataStructures,52
+103,Ankit,BigData,47
+104,Sneha,Mathematics,91
+104,Sneha,DataStructures,88
+104,Sneha,BigData,95

@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hadoop MapReduce — Student Examination Marks Analyzer</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="bg-slate-950 text-slate-100 font-sans min-h-screen flex flex-col">
+
+  <!-- Top Navigation Header -->
+  <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-30">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex flex-wrap items-center justify-between gap-4">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 font-mono font-bold text-lg">
+          MR
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="text-lg font-bold tracking-tight text-white">Apache Hadoop MapReduce Analyzer</h1>
+            <span class="text-xs font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">CA 1 Project</span>
+          </div>
+          <p class="text-xs text-slate-400">Student Examination Marks Processing Pipeline (HDFS + YARN Simulation)</p>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <button onclick="switchTab('simulator')" id="tab-simulator" class="px-3.5 py-2 rounded-lg text-xs font-semibold bg-amber-500 text-slate-950 transition">
+          Pipeline Simulator
+        </button>
+        <button onclick="switchTab('javacode')" id="tab-javacode" class="px-3.5 py-2 rounded-lg text-xs font-semibold bg-slate-800 text-slate-300 hover:bg-slate-700 transition">
+          Java Source & CLI
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content Container -->
+  <main class="max-w-7xl mx-auto w-full px-4 sm:px-6 py-6 flex-1">
+
+    <!-- SIMULATOR VIEW -->
+    <div id="view-simulator" class="space-y-6">
+      
+      <!-- Top Control Bar & Dataset Input -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        <!-- Left: HDFS Input Editor -->
+        <div class="lg:col-span-1 bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-xs font-mono uppercase tracking-wider text-amber-400 font-semibold">1. HDFS Input Dataset</span>
+            <button onclick="resetDefaultData()" class="text-xs text-slate-400 hover:text-white underline">Reset Sample</button>
+          </div>
+          <p class="text-xs text-slate-400 mb-3">Format: <code class="text-slate-200">RollNo,Name,Subject,Marks</code></p>
+          <textarea id="hdfs-input" rows="10" class="w-full flex-1 bg-slate-950 border border-slate-800 rounded-lg p-3 font-mono text-xs text-slate-200 focus:outline-none focus:border-amber-500 resize-none"></textarea>
+          
+          <div class="mt-4 flex gap-2">
+            <button onclick="runMapReduceJob()" id="run-btn" class="flex-1 bg-amber-500 hover:bg-amber-400 text-slate-950 font-semibold py-2.5 px-4 rounded-lg text-sm transition flex items-center justify-center gap-2 shadow-lg shadow-amber-500/10">
+              <span>▶ Submit YARN Job</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Right: Pipeline Status & Live YARN Console -->
+        <div class="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between mb-4">
+              <span class="text-xs font-mono uppercase tracking-wider text-sky-400 font-semibold">2. MapReduce Execution Stages</span>
+              <span id="job-status-badge" class="text-xs font-mono px-2.5 py-0.5 rounded bg-slate-800 text-slate-300">Status: READY</span>
+            </div>
+
+            <!-- 4-Step Visual Progress -->
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
+              <div id="stage-split" class="p-3 rounded-lg border border-slate-800 bg-slate-950/60 transition">
+                <div class="text-xs font-mono text-slate-400">Phase 01</div>
+                <div class="text-sm font-semibold text-white mt-0.5">InputSplit</div>
+                <div id="stat-split" class="text-xs font-mono text-amber-400 mt-1">0 lines</div>
+              </div>
+              <div id="stage-map" class="p-3 rounded-lg border border-slate-800 bg-slate-950/60 transition">
+                <div class="text-xs font-mono text-slate-400">Phase 02</div>
+                <div class="text-sm font-semibold text-white mt-0.5">MarksMapper</div>
+                <div id="stat-map" class="text-xs font-mono text-sky-400 mt-1">0 KV pairs</div>
+              </div>
+              <div id="stage-shuffle" class="p-3 rounded-lg border border-slate-800 bg-slate-950/60 transition">
+                <div class="text-xs font-mono text-slate-400">Phase 03</div>
+                <div class="text-sm font-semibold text-white mt-0.5">Shuffle & Sort</div>
+                <div id="stat-shuffle" class="text-xs font-mono text-purple-400 mt-1">0 keys grouped</div>
+              </div>
+              <div id="stage-reduce" class="p-3 rounded-lg border border-slate-800 bg-slate-950/60 transition">
+                <div class="text-xs font-mono text-slate-400">Phase 04</div>
+                <div class="text-sm font-semibold text-white mt-0.5">MarksReducer</div>
+                <div id="stat-reduce" class="text-xs font-mono text-emerald-400 mt-1">0 records</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Terminal Log Window -->
+          <div class="bg-slate-950 border border-slate-800 rounded-lg p-3 font-mono text-xs h-48 overflow-y-auto" id="yarn-logs"></div>
+        </div>
+      </div>
+
+      <!-- Intermediate Data Inspection: Mapper vs Shuffle -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <!-- Mapper Output -->
+        <div class="bg-slate-900 border border-slate-800 rounded-xl p-4">
+          <div class="flex items-center justify-between mb-3">
+            <span class="text-xs font-mono uppercase tracking-wider text-sky-400 font-semibold">Mapper Output — &lt;Text, IntWritable&gt;</span>
+            <span class="text-xs text-slate-400 font-mono">context.write(studentKey, marks)</span>
+          </div>
+          <div id="mapper-output-list" class="bg-slate-950 border border-slate-800 rounded-lg p-3 font-mono text-xs space-y-1.5 h-52 overflow-y-auto"></div>
+        </div>
+
+        <!-- Shuffle & Sort Output -->
+        <div class="bg-slate-900 border border-slate-800 rounded-xl p-4">
+          <div class="flex items-center justify-between mb-3">
+            <span class="text-xs font-mono uppercase tracking-wider text-purple-400 font-semibold">Shuffle & Sort — &lt;Text, Iterable&lt;IntWritable&gt;&gt;</span>
+            <span class="text-xs text-slate-400 font-mono">Grouped by Student Key</span>
+          </div>
+          <div id="shuffle-output-list" class="bg-slate-950 border border-slate-800 rounded-lg p-3 font-mono text-xs space-y-2 h-52 overflow-y-auto"></div>
+        </div>
+      </div>
+
+      <!-- Final Reducer Output & HDFS File -->
+      <div class="bg-slate-900 border border-slate-800 rounded-xl p-4">
+        <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
+          <div>
+            <span class="text-xs font-mono uppercase tracking-wider text-emerald-400 font-semibold">3. Final Reducer Output (HDFS /user/hadoop/marks_output/part-r-00000)</span>
+            <p class="text-xs text-slate-400 mt-0.5">Aggregated total score, average percentage, and grade classification per student</p>
+          </div>
+          <button onclick="downloadHdfsOutput()" class="px-3 py-1.5 rounded-lg text-xs font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/20 transition">
+            ⬇ Download part-r-00000
+          </button>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse text-sm">
+            <thead>
+              <tr class="border-b border-slate-800 text-xs font-mono text-slate-400 uppercase">
+                <th class="py-2.5 px-3">Student Key (Roll - Name)</th>
+                <th class="py-2.5 px-3">Subjects</th>
+                <th class="py-2.5 px-3">Total Marks</th>
+                <th class="py-2.5 px-3">Average (%)</th>
+                <th class="py-2.5 px-3">Final Grade</th>
+                <th class="py-2.5 px-3">Raw HDFS Value</th>
+              </tr>
+            </thead>
+            <tbody id="reducer-table-body" class="divide-y divide-slate-800/60 font-mono text-xs"></tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- JAVA SOURCE CODE & CLI VIEW -->
+    <div id="view-javacode" class="hidden space-y-6">
+      <div class="bg-slate-900 border border-slate-800 rounded-xl p-5">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-sm font-mono font-semibold text-amber-400">StudentMarksAnalysis.java</h2>
+          <button onclick="copyJavaCode()" id="copy-btn" class="text-xs font-mono px-3 py-1.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 transition">
+            Copy Java Code
+          </button>
+        </div>
+        <pre id="java-source-block" class="bg-slate-950 border border-slate-800 rounded-lg p-4 font-mono text-xs text-slate-200 overflow-x-auto leading-relaxed">import java.io.IOException;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.IntWritable;
+import org.apache.hadoop.io.LongWritable;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.mapreduce.Mapper;
+import org.apache.hadoop.mapreduce.Reducer;
+import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
+import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+
+public class StudentMarksAnalysis {
+
+    public static class MarksMapper extends Mapper&lt;LongWritable, Text, Text, IntWritable&gt; {
+        private Text studentKey = new Text();
+        private IntWritable marksValue = new IntWritable();
+
+        @Override
+        public void map(LongWritable key, Text value, Context context)
+                throws IOException, InterruptedException {
+            String line = value.toString().trim();
+            if (line.isEmpty()) return;
+
+            String[] fields = line.split(",");
+            if (fields.length == 4) {
+                String studentIdName = fields[0].trim() + " - " + fields[1].trim();
+                int marks = Integer.parseInt(fields[3].trim());
+
+                studentKey.set(studentIdName);
+                marksValue.set(marks);
+                context.write(studentKey, marksValue);
+            }
+        }
+    }
+
+    public static class MarksReducer extends Reducer&lt;Text, IntWritable, Text, Text&gt; {
+        private Text resultSummary = new Text();
+
+        @Override
+        public void reduce(Text key, Iterable&lt;IntWritable&gt; values, Context context)
+                throws IOException, InterruptedException {
+            int totalMarks = 0;
+            int subjectCount = 0;
+
+            for (IntWritable val : values) {
+                totalMarks += val.get();
+                subjectCount++;
+            }
+
+            double average = (subjectCount &gt; 0) ? (double) totalMarks / subjectCount : 0.0;
+            String grade = (average &gt;= 80) ? "A" : (average &gt;= 60) ? "B" : (average &gt;= 40) ? "C" : "F";
+
+            String output = String.format("Total: %d | Avg: %.2f | Grade: %s", totalMarks, average, grade);
+            resultSummary.set(output);
+            context.write(key, resultSummary);
+        }
+    }
+
+    public static void main(String[] args) throws Exception {
+        if (args.length != 2) {
+            System.err.println("Usage: StudentMarksAnalysis &lt;input path&gt; &lt;output path&gt;");
+            System.exit(-1);
+        }
+
+        Configuration conf = new Configuration();
+        Job job = Job.getInstance(conf, "Student Examination Marks Analysis");
+
+        job.setJarByClass(StudentMarksAnalysis.class);
+        job.setMapperClass(MarksMapper.class);
+        job.setReducerClass(MarksReducer.class);
+
+        job.setMapOutputKeyClass(Text.class);
+        job.setMapOutputValueClass(IntWritable.class);
+        job.setOutputKeyClass(Text.class);
+        job.setOutputValueClass(Text.class);
+
+        FileInputFormat.addInputPath(job, new Path(args[0]));
+        FileOutputFormat.setOutputPath(job, new Path(args[1]));
+
+        System.exit(job.waitForCompletion(true) ? 0 : 1);
+    }
+}</pre>
+      </div>
+    </div>
+
+  </main>
+
+  <script>
+    const defaultData = `101,Rahul,Mathematics,85
+101,Rahul,DataStructures,78
+101,Rahul,BigData,92
+102,Priya,Mathematics,64
+102,Priya,DataStructures,71
+102,Priya,BigData,69
+103,Ankit,Mathematics,45
+103,Ankit,DataStructures,52
+103,Ankit,BigData,47
+104,Sneha,Mathematics,91
+104,Sneha,DataStructures,88
+104,Sneha,BigData,95`;
+
+    let latestRawOutput = "";
+
+    function switchTab(tab) {
+      const simView = document.getElementById('view-simulator');
+      const javaView = document.getElementById('view-javacode');
+      const simBtn = document.getElementById('tab-simulator');
+      const javaBtn = document.getElementById('tab-javacode');
+
+      if (tab === 'simulator') {
+        simView.classList.remove('hidden');
+        javaView.classList.add('hidden');
+        simBtn.className = "px-3.5 py-2 rounded-lg text-xs font-semibold bg-amber-500 text-slate-950 transition";
+        javaBtn.className = "px-3.5 py-2 rounded-lg text-xs font-semibold bg-slate-800 text-slate-300 hover:bg-slate-700 transition";
+      } else {
+        simView.classList.add('hidden');
+        javaView.classList.remove('hidden');
+        javaBtn.className = "px-3.5 py-2 rounded-lg text-xs font-semibold bg-amber-500 text-slate-950 transition";
+        simBtn.className = "px-3.5 py-2 rounded-lg text-xs font-semibold bg-slate-800 text-slate-300 hover:bg-slate-700 transition";
+      }
+    }
+
+    function resetDefaultData() {
+      document.getElementById('hdfs-input').value = defaultData;
+      runMapReduceJob();
+    }
+
+    function logToYarn(msg, color = "text-slate-300") {
+      const logs = document.getElementById('yarn-logs');
+      const time = new Date().toTimeString().split(' ')[0];
+      logs.innerHTML += `<div class="${color}"><span class="text-slate-500">[${time}]</span> ${msg}</div>`;
+      logs.scrollTop = logs.scrollHeight;
+    }
+
+    function runMapReduceJob() {
+      const rawText = document.getElementById('hdfs-input').value.trim();
+      const lines = rawText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+      const logs = document.getElementById('yarn-logs');
+      logs.innerHTML = "";
+
+      const statusBadge = document.getElementById('job-status-badge');
+      statusBadge.textContent = "Status: RUNNING";
+      statusBadge.className = "text-xs font-mono px-2.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30";
+
+      logToYarn("INFO client.RMProxy: Connecting to ResourceManager at /0.0.0.0:8032", "text-slate-400");
+      logToYarn(`INFO input.FileInputFormat: Total input files to process : 1 (${lines.length} records)`, "text-amber-400");
+
+      // Phase 1 & 2: Map
+      const mappedPairs = [];
+      lines.forEach((line, idx) => {
+        const parts = line.split(',');
+        if (parts.length === 4) {
+          const key = `${parts[0].trim()} - ${parts[1].trim()}`;
+          const subject = parts[2].trim();
+          const marks = parseInt(parts[3].trim(), 10);
+          if (!isNaN(marks)) {
+            mappedPairs.push({ offset: idx * 32, key, subject, marks });
+          }
+        }
+      });
+
+      document.getElementById('stat-split').textContent = `${lines.length} lines`;
+      document.getElementById('stat-map').textContent = `${mappedPairs.length} KV pairs`;
+
+      const mapperContainer = document.getElementById('mapper-output-list');
+      mapperContainer.innerHTML = mappedPairs.map(p =>
+        `<div class="flex justify-between border-b border-slate-800/60 pb-1">
+          <span class="text-sky-400">"${p.key}"</span>
+          <span class="text-slate-400">${p.subject}</span>
+          <span class="text-amber-300 font-semibold">${p.marks}</span>
+        </div>`
+      ).join('');
+
+      logToYarn(`INFO mapreduce.Job: map 100% reduce 0% — Emitted ${mappedPairs.length} intermediate records`, "text-sky-400");
+
+      // Phase 3: Shuffle & Sort
+      const grouped = {};
+      mappedPairs.forEach(pair => {
+        if (!grouped[pair.key]) grouped[pair.key] = [];
+        grouped[pair.key].push(pair.marks);
+      });
+
+      const sortedKeys = Object.keys(grouped).sort();
+      document.getElementById('stat-shuffle').textContent = `${sortedKeys.length} keys grouped`;
+
+      const shuffleContainer = document.getElementById('shuffle-output-list');
+      shuffleContainer.innerHTML = sortedKeys.map(k =>
+        `<div class="flex justify-between items-center border-b border-slate-800/60 pb-1.5">
+          <span class="text-purple-400 font-semibold">"${k}"</span>
+          <span class="text-slate-200 bg-slate-900 px-2 py-0.5 rounded border border-slate-700">[ ${grouped[k].join(', ')} ]</span>
+        </div>`
+      ).join('');
+
+      logToYarn(`INFO mapreduce.Job: Shuffle & Lexicographical Sort completed across ${sortedKeys.length} student keys`, "text-purple-400");
+
+      // Phase 4: Reduce
+      const reducedRows = [];
+      latestRawOutput = "";
+
+      sortedKeys.forEach(key => {
+        const scores = grouped[key];
+        const total = scores.reduce((a, b) => a + b, 0);
+        const avg = scores.length > 0 ? total / scores.length : 0;
+        const grade = avg >= 80 ? 'A' : avg >= 60 ? 'B' : avg >= 40 ? 'C' : 'F';
+        const rawVal = `Total: ${total} | Avg: ${avg.toFixed(2)} | Grade: ${grade}`;
+        latestRawOutput += `${key}\t${rawVal}\n`;
+        reducedRows.push({ key, count: scores.length, total, avg: avg.toFixed(2), grade, rawVal });
+      });
+
+      document.getElementById('stat-reduce').textContent = `${reducedRows.length} records`;
+
+      const tbody = document.getElementById('reducer-table-body');
+      tbody.innerHTML = reducedRows.map(r => {
+        const badgeColor = r.grade === 'A' ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' :
+                           r.grade === 'B' ? 'bg-sky-500/15 text-sky-400 border-sky-500/30' :
+                           r.grade === 'C' ? 'bg-amber-500/15 text-amber-400 border-amber-500/30' :
+                                             'bg-rose-500/15 text-rose-400 border-rose-500/30';
+        return `<tr>
+          <td class="py-2.5 px-3 font-semibold text-white">${r.key}</td>
+          <td class="py-2.5 px-3 text-slate-300">${r.count}</td>
+          <td class="py-2.5 px-3 text-amber-300 font-semibold">${r.total}</td>
+          <td class="py-2.5 px-3 text-sky-300">${r.avg}%</td>
+          <td class="py-2.5 px-3"><span class="px-2 py-0.5 rounded border text-xs ${badgeColor}">Grade ${r.grade}</span></td>
+          <td class="py-2.5 px-3 text-slate-400">${r.rawVal}</td>
+        </tr>`;
+      }).join('');
+
+      logToYarn("INFO mapreduce.Job: map 100% reduce 100% — Job completed successfully!", "text-emerald-400");
+      logToYarn("INFO output.FileOutputFormat: Output written to HDFS /user/hadoop/marks_output/part-r-00000", "text-emerald-300");
+
+      statusBadge.textContent = "Status: SUCCEEDED";
+      statusBadge.className = "text-xs font-mono px-2.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30";
+    }
+
+    function downloadHdfsOutput() {
+      const blob = new Blob([latestRawOutput], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'part-r-00000.txt';
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function copyJavaCode() {
+      const code = document.getElementById('java-source-block').innerText;
+      navigator.clipboard.writeText(code);
+      const btn = document.getElementById('copy-btn');
+      btn.textContent = "Copied!";
+      setTimeout(() => btn.textContent = "Copy Java Code", 2000);
+    }
+
+    window.onload = resetDefaultData;
+  </script>
+</body>
+</html>
